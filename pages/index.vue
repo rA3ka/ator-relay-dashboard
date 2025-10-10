@@ -332,7 +332,7 @@
                 <div class="flex flex-col items-start gap-2">
                   <h3 class="text-sm">Total claimed rewards</h3>
                 </div>
-                <template v-if="hodlerInfoPending">
+                <template v-if="claimedPending">
                   <USkeleton class="w-[10rem] h-10 mt-2" />
                 </template>
                 <template v-else>
@@ -435,9 +435,27 @@
                     class="flex items-center gap-2 mt-2"
                   >
                     <span
-                      class="w-2 h-2 bg-red-600 rounded-full text-xs"
+                      class="w-1 h-1 bg-red-600 rounded-full text-xs"
                     ></span>
                     <span>Mainnet balance too low</span>
+                    <Popover
+                      placement="top"
+                      :arrow="false"
+                      class="h-max grid place-items-center"
+                  >
+                    <template #content>
+                      <div class="text-xs font-normal">
+                        <span class="text-xs font-normal">
+                          Your wallet <strong>must</strong> hold 100 $ANYONE tokens on Ethereum mainnet for every <strong>Active Relay</strong> (Excluding Anyone hardware relays) or the eligble airdrop will be forfeited.
+                        <br />
+                          Current balance: <b>{{ (Number(tokenBalance.value) / Math.pow(10, tokenBalance.decimals)).toFixed(0) }}</b>
+                        </span>
+                      </div>
+                    </template>
+                    <template #trigger>
+                      <Icon name="heroicons:exclamation-circle" />
+                    </template>
+                  </Popover>
                   </div>
                 </template>
               </div>
@@ -459,7 +477,6 @@
                   <Ticker class="text-sm" />
                 </template>
               </div>
-
               <div
                 v-if="isConnected"
                 class="redeem flex gap-6 items-center flex-shrink-0"
@@ -483,7 +500,6 @@
                       <template #indicator="{ progressLoading }">
                         <div class="text-center">
                           <span v-if="progressLoading === 1" class="text-xs">
-                            1 / 2 Accepting Request...
                           </span>
                           <span v-else class="text-xs">
                             2 / 2 Accepting Request...
@@ -498,10 +514,24 @@
           </Card>
           <Card title="Your relays" icon="eos-icons:product-classes-outlined">
             <div class="flex flex-col lg:flex-row gap-16 mt-12">
-              <div
-                class="mb-4 flex flex-col border-l-4 border-cyan-600 lg:my-0 pl-3 h-full"
-              >
+              <div class="mb-4 flex flex-col border-l-4 border-cyan-600 lg:my-0 pl-3 h-full">
+                <div class="flex items-center gap-1">
                 <h3 class="text-sm">Registered Relays</h3>
+                  <Popover
+                    placement="top"
+                    :arrow="false"
+                    class="h-max grid place-items-center"
+                  >
+                    <template #content>
+                      <span class="text-xs font-normal">
+                        All relay fingerprints regardless of state that are referenced to this wallet.
+                      </span>
+                    </template>
+                    <template #trigger>
+                      <Icon name="heroicons:exclamation-circle" />
+                    </template>
+                  </Popover>
+                </div>
                 <div class="inline-flex flex-col items-baseline">
                   <template v-if="allRelaysPending">
                     <USkeleton class="w-[10rem] h-10" />
@@ -514,12 +544,49 @@
                       --
                     </span>
                   </template>
-                </div>
               </div>
-              <div
-                class="mb-4 flex flex-col border-l-4 border-cyan-600 lg:my-0 pl-3 h-full"
+              </div>
+              <div class="mb-4 flex flex-col border-l-4 border-cyan-600 lg:my-0 pl-3 h-full"
               >
-                <h3 class="text-sm">Active Relays</h3>
+                <h3 class="text-sm">Claimed Relays</h3>
+                  <template v-if="allRelaysPending || hardwareStatusPending">
+                    <USkeleton class="w-[10rem] h-10" />
+                  </template>
+                  <template v-else>
+                    <span v-if="isConnected" class="text-4xl font-medium">
+                      {{
+                        allRelays.filter((relay) =>
+                          checkIsHardware(relay.fingerprint)
+                            ? relay.active && relay.status === 'verified'
+                            : relay.active &&
+                              relay.status === 'verified'
+                        ).length
+                      }}                      
+                    </span>
+                    <span v-if="!isConnected" class="text-4xl font-medium">
+                      --
+                    </span>
+                  </template>
+              </div>
+              <div class="mb-4 flex flex-col border-l-4 border-cyan-600 lg:my-0 pl-3 h-full"
+              >
+              <div class="flex items-center gap-1">
+              <h3 class="text-sm">Active Relays</h3>
+                  <Popover
+                    placement="top"
+                    :arrow="false"
+                    class="h-max grid place-items-center"
+                  >
+                    <template #content>
+                      <span class="text-xs font-normal">
+                        Relays that are <strong>Locked</strong> and <strong>Claimed</strong>. Anyone Hardware Relays can't and don't require a lock and is included in this total.
+                      </span>
+                    </template>
+                    <template #trigger>
+                      <Icon name="heroicons:exclamation-circle" />
+                    </template>
+                  </Popover>
+                </div>
                 <div class="inline-flex flex-col items-baseline">
                   <template v-if="allRelaysPending || hardwareStatusPending">
                     <USkeleton class="w-[10rem] h-10" />
@@ -586,7 +653,7 @@ const { allRelays } = storeToRefs(userStore);
 const isRedeemLoading = ref(false);
 const progressLoading = ref(0);
 const lockedPending = ref(false);
-// const claimedPending = ref(true);
+const claimedPending = ref(true);
 const claimablePending = ref(true);
 
 // watch(allRelays, (newRelays) => {
@@ -660,7 +727,7 @@ const fetchInitialData = async (
   try {
     if (!hodlerStore?.initialized || forceRefresh) {
       lockedPending.value = true;
-      // claimedPending.value = true;
+      claimedPending.value = true;
       claimablePending.value = true;
     }
 
@@ -675,6 +742,7 @@ const fetchInitialData = async (
   } finally {
     //wait 1 second before setting pending to false
     lockedPending.value = false;
+    claimedPending.value = false;
     claimablePending.value = false;
   }
 };
@@ -862,10 +930,14 @@ const {
   address: hodlerContract,
   abi: hodlerAbi,
   functionName: 'hodlers',
-  args: [computed(() => address.value as `0x${string}`)],
-  query: {
-    enabled: computed(() => !!address.value),
-  },
+  args: [address.value as `0x${string}`],
+  query: { enabled: true },
+});
+
+watch(hodlerInfo, (info) => {
+  if (info) {
+    console.log('hodlerInfo: ', toRaw(info));
+  }
 });
 
 const totalClaimable = computed(() => {
@@ -907,7 +979,7 @@ const {
   address: hodlerContract,
   abi: hodlerAbi,
   functionName: 'getStakes',
-  args: [computed(() => address.value as `0x${string}`)],
+  args: [address.value as `0x${string}`],
   query: {
     enabled: computed(() => !!address.value),
   },
@@ -930,7 +1002,7 @@ const {
   address: hodlerContract,
   abi: hodlerAbi,
   functionName: 'getVaults',
-  args: [computed(() => address.value as `0x${string}`)],
+  args: [address.value as `0x${string}`],
   query: {
     enabled: computed(() => !!address.value),
   },
